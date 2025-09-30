@@ -2,7 +2,7 @@
 name: Tika-Gotenberg
 version: dev
 slug: tika-gotenberg
-url: https://github.com/BenoitAnastay/tika-gotenberg-home-assistant-addon
+url: https://github.com/arwindersingh82/tika-gotenberg-home-assistant-addon
 init: false
 description: An extension for paperless addon to use Tika and Gotenberg
 arch:

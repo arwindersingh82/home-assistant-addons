@@ -11,7 +11,7 @@ ARG GOLANG_VERSION="1.24"
 
 FROM golang:$GOLANG_VERSION AS pdfcpu-binary-stage
 
-ARG PDFCPU_VERSION=v0.8.1
+ARG PDFCPU_VERSION=v0.9.0
 ENV CGO_ENABLED=0
 
 # Define the working directory outside of $GOPATH (we're using go modules).
@@ -33,7 +33,7 @@ RUN go build -o pdfcpu -ldflags "-s -w -X 'main.version=$PDFCPU_VERSION' -X 'git
 # ----------------------------------------------
 FROM golang:$GOLANG_VERSION AS gotenberg-binary-stage
 
-ARG GOTENBERG_VERSION="v8.18.0"
+ARG GOTENBERG_VERSION="v8.19.0"
 ENV CGO_ENABLED=0
 
 # Define the working directory outside of $GOPATH (we're using go modules).
@@ -50,7 +50,7 @@ RUN go build -o gotenberg -ldflags "-X 'github.com/gotenberg/gotenberg/v8/cmd.Ve
 FROM debian:bookworm AS fetch_tika
 
 ARG CHECK_SIG=true
-ARG TIKA_VERSION="3.1.0"
+ARG TIKA_VERSION="3.2.0"
 
 ENV NEAREST_TIKA_SERVER_URL="https://dlcdn.apache.org/tika/${TIKA_VERSION}/tika-server-standard-${TIKA_VERSION}.jar" \
     ARCHIVE_TIKA_SERVER_URL="https://archive.apache.org/dist/tika/${TIKA_VERSION}/tika-server-standard-${TIKA_VERSION}.jar" \
