@@ -6,6 +6,7 @@ ARG GOLANG_VERSION="1.25.5"
 ARG PDFCPU_VERSION="v0.9.0"
 ARG GOTENBERG_VERSION="v8.26.0"
 ARG TIKA_VERSION="3.2.0"
+ARG NOTO_COLOR_EMOJI_VERSION="main"
 
 # ----------------------------------------------
 # pdfcpu binary build stage
@@ -17,7 +18,6 @@ ENV CGO_ENABLED=0
 ENV PDFCPU_VERSION=${PDFCPU_VERSION}
 WORKDIR /home
 
-# Download and build pdfcpu
 RUN curl -Ls "https://github.com/pdfcpu/pdfcpu/archive/refs/tags/${PDFCPU_VERSION}.tar.gz" -o pdfcpu.tar.gz && \
     tar --strip-components=1 -xvzf pdfcpu.tar.gz && \
     GOPROXY=direct go mod download && \
@@ -35,14 +35,11 @@ ENV CGO_ENABLED=0
 ENV GOTENBERG_VERSION=${GOTENBERG_VERSION}
 WORKDIR /home
 
-# Download Gotenberg source
 RUN curl -Ls "https://github.com/gotenberg/gotenberg/archive/refs/tags/${GOTENBERG_VERSION}.tar.gz" -o gotenberg.tar.gz && \
     tar --strip-components=1 -xvzf gotenberg.tar.gz
 
-# Pre-fetch dependencies separately to avoid network issues mid-build
 RUN GOPROXY=direct go mod download && GOPROXY=direct go mod verify
 
-# Build gotenberg binary
 RUN go build -o gotenberg -ldflags "-X 'github.com/gotenberg/gotenberg/v8/cmd.Version=${GOTENBERG_VERSION}'" cmd/gotenberg/main.go
 
 # ----------------------------------------------
@@ -90,12 +87,13 @@ RUN groupadd --gid 1000 gotenberg && \
     useradd --uid 1000 --gid gotenberg --shell /bin/bash --home /home/gotenberg --no-create-home gotenberg && \
     mkdir /home/gotenberg && chown gotenberg: /home/gotenberg
 
-# Install base dependencies
+# Install system dependencies + fonts
 RUN apt-get update -qq && \
     apt-get upgrade -yqq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
-        curl gnupg tini python3 default-jre-headless wget ca-certificates fonts-dejavu fonts-liberation \
-        fonts-noto-core fonts-noto-ui-core fonts-noto-mono && \
+        curl gnupg tini python3 default-jre-headless wget ca-certificates \
+        fonts-dejavu fonts-liberation fonts-noto-core fonts-noto-ui-core fonts-noto-mono xfonts-utils \
+        libreoffice qpdf libimage-exiftool-perl && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Install Google Chrome / Chromium
@@ -119,9 +117,19 @@ COPY --from=fetch_tika /tika-server-standard.jar /usr/bin/tika-server-standard.j
 
 # Environment variables
 ENV CHROMIUM_BIN_PATH=/usr/bin/chromium \
+    CHROMIUM_HYPHEN_DATA_DIR_PATH=/tmp/chromium \
+    CHROMIUM_DISABLE_SANDBOX=true \
     LIBREOFFICE_BIN_PATH=/usr/lib/libreoffice/program/soffice.bin \
     UNOCONVERTER_BIN_PATH=/usr/bin/unoconverter \
     PDFTK_BIN_PATH=/usr/bin/pdftk \
     QPDF_BIN_PATH=/usr/bin/qpdf \
     EXIFTOOL_BIN_PATH=/usr/bin/exiftool \
     PDFCPU_BIN_PATH=/usr/bin/pdfcpu
+
+
+# Expose default API port
+EXPOSE 3000
+
+# Use tini as entrypoint
+ENTRYPOINT [ "/usr/bin/tini", "--" ]
+CMD [ "gotenberg" ]
