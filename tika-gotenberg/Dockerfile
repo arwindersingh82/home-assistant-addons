@@ -5,7 +5,6 @@ ARG GOLANG_VERSION=1.25.5
 ARG PDFCPU_VERSION=v0.11.1
 ARG GOTENBERG_VERSION=v8.26.0
 ARG TIKA_VERSION=3.2.3
-ARG PDFTK_VERSION=v4.1.9
 ARG NOTO_COLOR_EMOJI_VERSION=main
 
 # --------------------------------------------------------------
@@ -40,9 +39,11 @@ RUN curl -fSL https://github.com/gotenberg/gotenberg/archive/refs/tags/${GOTENBE
 # --------------------------------------------------------------
 FROM debian:bookworm-slim AS tika-fetch
 ARG TIKA_VERSION
+
+# Install minimal tools for fetching and verifying Tika
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends wget gnupg ca-certificates curl dirmgr && \
-    wget -O /tika-server.jar https://dlcdn.apache.org/tika/${TIKA_VERSION}/tika-server-standard-${TIKA_VERSION}.jar && \
+    apt-get install -y --no-install-recommends gnupg curl ca-certificates && \
+    curl -Ls https://downloads.apache.org/tika/${TIKA_VERSION}/tika-server-standard-${TIKA_VERSION}.jar -o /tika-server.jar && \
     rm -rf /var/lib/apt/lists/*
 
 # --------------------------------------------------------------
@@ -51,12 +52,10 @@ RUN apt-get update && \
 FROM debian:bookworm-slim
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install core dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+# Core dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates \
       curl \
-      wget \
       tini \
       default-jre-headless \
       libreoffice \
@@ -84,8 +83,7 @@ RUN curl -o /tmp/ttf-mscorefonts-installer_3.8.1_all.deb http://httpredir.debian
     rm -f /tmp/ttf-mscorefonts-installer_3.8.1_all.deb && rm -rf /var/lib/apt/lists/*
 
 # Additional language / emoji fonts
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
       culmus \
       fonts-beng \
       fonts-hosny-amiri \
@@ -140,7 +138,7 @@ COPY --from=tika-fetch /tika-server.jar /usr/local/bin/tika-server.jar
 # Chromium hyphenation data
 RUN mkdir -p /tmp/chromium && chown -R 1000:1000 /tmp/chromium
 
-# Environment
+# Environment variables
 ENV CHROMIUM_BIN_PATH=/usr/bin/chromium \
     LIBREOFFICE_BIN_PATH=/usr/lib/libreoffice/program/soffice.bin \
     UNOCONVERTER_BIN_PATH=/usr/bin/unoconv \
