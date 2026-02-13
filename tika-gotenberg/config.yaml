@@ -1,6 +1,6 @@
 ---
 name: Tika-Gotenberg
-version: "2.0.1b"
+version: "2.0.2b"
 slug: tika-gotenberg
 url: https://github.com/arwindersingh82/tika-gotenberg-home-assistant-addon
 init: false
