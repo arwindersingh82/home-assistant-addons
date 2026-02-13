@@ -41,7 +41,7 @@ RUN curl -fSL https://github.com/gotenberg/gotenberg/archive/refs/tags/${GOTENBE
 FROM debian:bookworm-slim AS tika-fetch
 ARG TIKA_VERSION
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends wget gnupg2 ca-certificates && \
+    apt-get install -y --no-install-recommends wget gnupg ca-certificates curl dirmgr && \
     wget -O /tika-server.jar https://dlcdn.apache.org/tika/${TIKA_VERSION}/tika-server-standard-${TIKA_VERSION}.jar && \
     rm -rf /var/lib/apt/lists/*
 
