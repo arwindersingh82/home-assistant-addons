@@ -115,13 +115,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -Ls "https://github.com/googlefonts/noto-emoji/raw/${NOTO_COLOR_EMOJI_VERSION}/fonts/NotoColorEmoji.ttf" -o /usr/local/share/fonts/NotoColorEmoji.ttf
 
 # Chrome / Chromium pinned
-RUN if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
-        CHROME_VERSION=117.0.5938.92-1 && \
-        curl -fsSL https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_${CHROME_VERSION}_amd64.deb -o /tmp/chrome.deb && \
-        apt-get update && apt-get install -y --no-install-recommends /tmp/chrome.deb && rm -f /tmp/chrome.deb && \
-        mv /usr/bin/google-chrome-stable /usr/bin/chromium; \
-    else \
-        apt-get update && apt-get install -y --no-install-recommends chromium; \
+RUN apt-get update && apt-get install -y --no-install-recommends chromium; \
     fi && rm -rf /var/lib/apt/lists/*
 
 # Python symlink for unoconv
