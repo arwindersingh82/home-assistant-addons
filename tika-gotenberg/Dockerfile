@@ -40,101 +40,81 @@ RUN curl -fSL https://github.com/gotenberg/gotenberg/archive/refs/tags/${GOTENBE
 FROM debian:bookworm-slim AS tika-fetch
 ARG TIKA_VERSION
 
-# Install minimal tools for fetching and verifying Tika
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends gnupg curl ca-certificates && \
+    apt-get install -y --no-install-recommends curl ca-certificates && \
     curl -Ls https://downloads.apache.org/tika/${TIKA_VERSION}/tika-server-standard-${TIKA_VERSION}.jar -o /tika-server.jar && \
     rm -rf /var/lib/apt/lists/*
 
 # --------------------------------------------------------------
-# Final runtime image
+# Final HA runtime image
 # --------------------------------------------------------------
 FROM debian:bookworm-slim
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Core dependencies with pins
+# Core dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-      ca-certificates \
-      curl \
-      tini \
-      default-jre-headless \
-      libreoffice \
-      unoconv \
-      qpdf \
-      pdftk-java \
-      libimage-exiftool-perl \
-      fonts-dejavu \
-      fonts-dejavu-extra \
-      fonts-liberation \
-      fonts-liberation2 \
-      fonts-noto-core \
-      fonts-noto-ui-core \
-      fonts-noto-mono \
-      fonts-noto-cjk \
-      cabextract \
-      gnupg \
-      python3 \
-      fontconfig \
+      ca-certificates curl tini default-jre-headless libreoffice unoconv qpdf \
+      pdftk-java libimage-exiftool-perl fonts-dejavu fonts-dejavu-extra \
+      fonts-liberation fonts-liberation2 fonts-noto-core fonts-noto-ui-core \
+      fonts-noto-mono fonts-noto-cjk cabextract gnupg python3 fontconfig \
+      chromium \
       && rm -rf /var/lib/apt/lists/*
 
-# Microsoft core fonts
-RUN curl -o /tmp/ttf-mscorefonts-installer_3.8.1_all.deb http://httpredir.debian.org/debian/pool/contrib/m/msttcorefonts/ttf-mscorefonts-installer_3.8.1_all.deb && \
+# Microsoft fonts
+RUN curl -o /tmp/ttf-mscorefonts-installer_3.8.1_all.deb \
+      http://httpredir.debian.org/debian/pool/contrib/m/msttcorefonts/ttf-mscorefonts-installer_3.8.1_all.deb && \
     apt-get update && apt-get install -y --no-install-recommends /tmp/ttf-mscorefonts-installer_3.8.1_all.deb && \
     rm -f /tmp/ttf-mscorefonts-installer_3.8.1_all.deb && rm -rf /var/lib/apt/lists/*
 
-# Additional language / emoji fonts
+# Additional fonts (CJK, emoji, Indic)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      culmus \
-      fonts-beng \
-      fonts-hosny-amiri \
-      fonts-lklug-sinhala \
-      fonts-lohit-guru \
-      fonts-lohit-knda \
-      fonts-samyak-gujr \
-      fonts-samyak-mlym \
-      fonts-samyak-taml \
-      fonts-sarai \
-      fonts-sil-abyssinica \
-      fonts-sil-padauk \
-      fonts-telu \
-      fonts-thai-tlwg \
-      fonts-wqy-zenhei \
-      fonts-arphic-ukai \
-      fonts-arphic-uming \
-      fonts-ipafont-mincho \
-      fonts-ipafont-gothic \
-      fonts-unfonts-core \
-      fonts-crosextra-caladea \
-      fonts-crosextra-carlito \
-      fonts-sil-gentium \
-      fonts-sil-gentium-basic \
-      && rm -rf /var/lib/apt/lists/*
+      culmus fonts-beng fonts-hosny-amiri fonts-lklug-sinhala fonts-lohit-guru \
+      fonts-lohit-knda fonts-samyak-gujr fonts-samyak-mlym fonts-samyak-taml \
+      fonts-sarai fonts-sil-abyssinica fonts-sil-padauk fonts-telu fonts-thai-tlwg \
+      fonts-wqy-zenhei fonts-arphic-ukai fonts-arphic-uming fonts-ipafont-mincho \
+      fonts-ipafont-gothic fonts-unfonts-core fonts-crosextra-caladea fonts-crosextra-carlito \
+      fonts-sil-gentium fonts-sil-gentium-basic && \
+    rm -rf /var/lib/apt/lists/*
 
 # Noto Color Emoji
 RUN curl -Ls "https://github.com/googlefonts/noto-emoji/raw/${NOTO_COLOR_EMOJI_VERSION}/fonts/NotoColorEmoji.ttf" -o /usr/local/share/fonts/NotoColorEmoji.ttf
 
-# Chromium from Debian repo (stable)
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends chromium && \
-    rm -rf /var/lib/apt/lists/*
-
-# Python symlink for unoconv
+# Symlink python for unoconv
 RUN ln -s /usr/bin/python3 /usr/bin/python || true
+
+RUN apt-get update && apt-get install -y xz-utils && rm -rf /var/lib/apt/lists/*
+
+# --------------------------------------------------------------
+# S6 Overlay
+# --------------------------------------------------------------
+ARG S6_OVERLAY_VERSION=v3.2.2.0
+RUN curl -L -o /tmp/s6-overlay-x86_64.tar.xz \
+    https://github.com/just-containers/s6-overlay/releases/download/${S6_OVERLAY_VERSION}/s6-overlay-x86_64.tar.xz && \
+    tar -xJf /tmp/s6-overlay-x86_64.tar.xz -C / && rm /tmp/s6-overlay-x86_64.tar.xz
+
 
 # Runtime user
 RUN useradd -m -u 1000 gotenberg
+
+# Wrapper scripts (HA-style) as root
+RUN echo '#!/bin/bash\nexec java -jar /usr/local/bin/tika-server-standard.jar "$@"' > /usr/local/bin/tika && \
+    chmod +x /usr/local/bin/tika && \
+    echo '#!/bin/bash\nexec java -jar /usr/local/bin/pdftk-all.jar "$@"' > /usr/local/bin/pdftk && \
+    chmod +x /usr/local/bin/pdftk
+
+# Then switch to gotenberg user
 USER gotenberg
 
 # Copy built binaries
 COPY --from=pdfcpu-builder /pdfcpu /usr/local/bin/pdfcpu
 COPY --from=gotenberg-builder /build/gotenberg /usr/local/bin/gotenberg
-COPY --from=tika-fetch /tika-server.jar /usr/local/bin/tika-server.jar
+COPY --from=tika-fetch /tika-server.jar /usr/local/bin/tika-server-standard.jar
 
-# Chromium hyphenation data
-RUN mkdir -p /tmp/chromium && chown -R 1000:1000 /tmp/chromium
+# S6 overlay setup (copy your rootfs)
+COPY rootfs/ /
 
-# Environment variables
+# Environment
 ENV CHROMIUM_BIN_PATH=/usr/bin/chromium \
     LIBREOFFICE_BIN_PATH=/usr/lib/libreoffice/program/soffice.bin \
     UNOCONVERTER_BIN_PATH=/usr/bin/unoconv \
@@ -145,6 +125,7 @@ ENV CHROMIUM_BIN_PATH=/usr/bin/chromium \
     CHROMIUM_DISABLE_SANDBOX=true \
     CHROMIUM_HYPHEN_DATA_DIR_PATH=/tmp/chromium
 
-EXPOSE 3000
-ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["gotenberg"]
+EXPOSE 3000 9998
+
+ENTRYPOINT ["/init"]
+CMD []
