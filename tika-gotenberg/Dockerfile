@@ -114,9 +114,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Noto Color Emoji
 RUN curl -Ls "https://github.com/googlefonts/noto-emoji/raw/${NOTO_COLOR_EMOJI_VERSION}/fonts/NotoColorEmoji.ttf" -o /usr/local/share/fonts/NotoColorEmoji.ttf
 
-# Chrome / Chromium pinned
-RUN apt-get update && apt-get install -y --no-install-recommends chromium; \
-    fi && rm -rf /var/lib/apt/lists/*
+# Chromium from Debian repo (stable)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends chromium && \
+    rm -rf /var/lib/apt/lists/*
 
 # Python symlink for unoconv
 RUN ln -s /usr/bin/python3 /usr/bin/python || true
