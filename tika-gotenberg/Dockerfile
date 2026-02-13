@@ -6,6 +6,7 @@ ARG PDFCPU_VERSION=v0.11.1
 ARG GOTENBERG_VERSION=v8.26.0
 ARG TIKA_VERSION=3.2.3
 ARG NOTO_COLOR_EMOJI_VERSION=main
+#ARG S6_OVERLAY_VERSION=v3.2.2.0
 
 # --------------------------------------------------------------
 # PDFCPU build stage
@@ -32,7 +33,8 @@ WORKDIR /build
 
 RUN curl -fSL https://github.com/gotenberg/gotenberg/archive/refs/tags/${GOTENBERG_VERSION}.tar.gz -o gotenberg.tar.gz && \
     tar -xzf gotenberg.tar.gz --strip-components=1 && rm gotenberg.tar.gz && \
-    go mod download && go build -o gotenberg -ldflags "-X github.com/gotenberg/gotenberg/v8/cmd.Version=${GOTENBERG_VERSION}" cmd/gotenberg/main.go
+    go mod download && \
+    go build -o gotenberg -ldflags "-X github.com/gotenberg/gotenberg/v8/cmd.Version=${GOTENBERG_VERSION}" cmd/gotenberg/main.go
 
 # --------------------------------------------------------------
 # Tika fetch stage
@@ -46,20 +48,20 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # --------------------------------------------------------------
-# Final HA runtime image
+# Final minimal runtime
 # --------------------------------------------------------------
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim AS runtime
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Core dependencies
+# Install only runtime dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-      ca-certificates curl tini default-jre-headless libreoffice unoconv qpdf \
+      ca-certificates curl default-jre-headless libreoffice unoconv qpdf \
       pdftk-java libimage-exiftool-perl fonts-dejavu fonts-dejavu-extra \
       fonts-liberation fonts-liberation2 fonts-noto-core fonts-noto-ui-core \
       fonts-noto-mono fonts-noto-cjk cabextract gnupg python3 fontconfig \
-      chromium \
-      && rm -rf /var/lib/apt/lists/*
+      chromium xz-utils && \
+    rm -rf /var/lib/apt/lists/*
 
 # Microsoft fonts
 RUN curl -o /tmp/ttf-mscorefonts-installer_3.8.1_all.deb \
@@ -67,51 +69,40 @@ RUN curl -o /tmp/ttf-mscorefonts-installer_3.8.1_all.deb \
     apt-get update && apt-get install -y --no-install-recommends /tmp/ttf-mscorefonts-installer_3.8.1_all.deb && \
     rm -f /tmp/ttf-mscorefonts-installer_3.8.1_all.deb && rm -rf /var/lib/apt/lists/*
 
-# Additional fonts (CJK, emoji, Indic)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      culmus fonts-beng fonts-hosny-amiri fonts-lklug-sinhala fonts-lohit-guru \
-      fonts-lohit-knda fonts-samyak-gujr fonts-samyak-mlym fonts-samyak-taml \
-      fonts-sarai fonts-sil-abyssinica fonts-sil-padauk fonts-telu fonts-thai-tlwg \
-      fonts-wqy-zenhei fonts-arphic-ukai fonts-arphic-uming fonts-ipafont-mincho \
-      fonts-ipafont-gothic fonts-unfonts-core fonts-crosextra-caladea fonts-crosextra-carlito \
-      fonts-sil-gentium fonts-sil-gentium-basic && \
-    rm -rf /var/lib/apt/lists/*
-
 # Noto Color Emoji
 RUN curl -Ls "https://github.com/googlefonts/noto-emoji/raw/${NOTO_COLOR_EMOJI_VERSION}/fonts/NotoColorEmoji.ttf" -o /usr/local/share/fonts/NotoColorEmoji.ttf
 
 # Symlink python for unoconv
 RUN ln -s /usr/bin/python3 /usr/bin/python || true
 
-RUN apt-get update && apt-get install -y xz-utils && rm -rf /var/lib/apt/lists/*
+ARG S6_OVERLAY_VERSION=v3.2.2.0
 
 # --------------------------------------------------------------
 # S6 Overlay
 # --------------------------------------------------------------
-ARG S6_OVERLAY_VERSION=v3.2.2.0
 RUN curl -L -o /tmp/s6-overlay-x86_64.tar.xz \
     https://github.com/just-containers/s6-overlay/releases/download/${S6_OVERLAY_VERSION}/s6-overlay-x86_64.tar.xz && \
-    tar -xJf /tmp/s6-overlay-x86_64.tar.xz -C / && rm /tmp/s6-overlay-x86_64.tar.xz
-
+    tar -xJf /tmp/s6-overlay-x86_64.tar.xz -C / --strip-components=1 && \
+    rm /tmp/s6-overlay-x86_64.tar.xz
 
 # Runtime user
 RUN useradd -m -u 1000 gotenberg
 
-# Wrapper scripts (HA-style) as root
+# Wrapper scripts
 RUN echo '#!/bin/bash\nexec java -jar /usr/local/bin/tika-server-standard.jar "$@"' > /usr/local/bin/tika && \
     chmod +x /usr/local/bin/tika && \
     echo '#!/bin/bash\nexec java -jar /usr/local/bin/pdftk-all.jar "$@"' > /usr/local/bin/pdftk && \
     chmod +x /usr/local/bin/pdftk
 
-# Then switch to gotenberg user
+# Switch to non-root
 USER gotenberg
 
-# Copy built binaries
+# Copy built binaries only
 COPY --from=pdfcpu-builder /pdfcpu /usr/local/bin/pdfcpu
 COPY --from=gotenberg-builder /build/gotenberg /usr/local/bin/gotenberg
 COPY --from=tika-fetch /tika-server.jar /usr/local/bin/tika-server-standard.jar
 
-# S6 overlay setup (copy your rootfs)
+# Optional: your HA rootfs
 COPY rootfs/ /
 
 # Environment
@@ -127,5 +118,5 @@ ENV CHROMIUM_BIN_PATH=/usr/bin/chromium \
 
 EXPOSE 3000 9998
 
-ENTRYPOINT ["/init"]
+ENTRYPOINT ["/command/s6-rc-init"]
 CMD []
