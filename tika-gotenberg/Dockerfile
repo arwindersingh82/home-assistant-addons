@@ -59,10 +59,10 @@ RUN apt-get update && \
       curl \
       tini \
       default-jre-headless \
-      libreoffice=7.6.7.2-3+deb12u1 \
+      libreoffice \
       unoconv \
-      qpdf=12.1.0-1 \
-      pdftk-java=3.3.6-1 \
+      qpdf \
+      pdftk-java \
       libimage-exiftool-perl \
       fonts-dejavu \
       fonts-dejavu-extra \
@@ -74,7 +74,7 @@ RUN apt-get update && \
       fonts-noto-cjk \
       cabextract \
       gnupg \
-      python3=3.11.7-1 \
+      python3 \
       fontconfig \
       && rm -rf /var/lib/apt/lists/*
 
