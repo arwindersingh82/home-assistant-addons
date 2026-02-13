@@ -82,6 +82,35 @@ This ensures:
 
 ---
 
+## Verify Installation / Test Commands
+
+After building or deploying the add-on, you can verify that all binaries and services are correctly installed and functional. Run these commands inside the container terminal:
+
+```bash
+# Check binaries exist and display their versions
+gotenberg --version
+pdfcpu version
+java -jar /usr/local/bin/tika-server.jar --version
+chromium --version
+libreoffice --version
+unoconv --version
+pdftk --version
+qpdf --version
+exiftool --version
+
+# Start Tika server in the background and test HTTP endpoint
+java -jar /usr/local/bin/tika-server.jar &
+curl http://localhost:9998/tika
+
+```
+
+###  These commands confirm:
+
+- Gotenberg and PDF engines are working
+- Apache Tika server is available
+- Chromium, LibreOffice, unoconv, and other conversion tools are installed
+- Metadata and PDF processing engines function as expected
+
 ## Philosophy
 
 Infrastructure services such as document ingestion and processing are foundational components.  
