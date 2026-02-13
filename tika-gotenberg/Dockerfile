@@ -52,16 +52,17 @@ RUN apt-get update && \
 FROM debian:bookworm-slim
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Core dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Core dependencies with pins
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
       ca-certificates \
       curl \
       tini \
       default-jre-headless \
-      libreoffice \
+      libreoffice=7.6.7.2-3+deb12u1 \
       unoconv \
-      qpdf \
-      pdftk-java \
+      qpdf=12.1.0-1 \
+      pdftk-java=3.3.6-1 \
       libimage-exiftool-perl \
       fonts-dejavu \
       fonts-dejavu-extra \
@@ -73,7 +74,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       fonts-noto-cjk \
       cabextract \
       gnupg \
-      python3 \
+      python3=3.11.7-1 \
       fontconfig \
       && rm -rf /var/lib/apt/lists/*
 
@@ -113,11 +114,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Noto Color Emoji
 RUN curl -Ls "https://github.com/googlefonts/noto-emoji/raw/${NOTO_COLOR_EMOJI_VERSION}/fonts/NotoColorEmoji.ttf" -o /usr/local/share/fonts/NotoColorEmoji.ttf
 
-# Chrome / Chromium
+# Chrome / Chromium pinned
 RUN if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
-        curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | apt-key add - && \
-        echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
-        apt-get update && apt-get install -y --no-install-recommends google-chrome-stable && \
+        CHROME_VERSION=117.0.5938.92-1 && \
+        curl -fsSL https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_${CHROME_VERSION}_amd64.deb -o /tmp/chrome.deb && \
+        apt-get update && apt-get install -y --no-install-recommends /tmp/chrome.deb && rm -f /tmp/chrome.deb && \
         mv /usr/bin/google-chrome-stable /usr/bin/chromium; \
     else \
         apt-get update && apt-get install -y --no-install-recommends chromium; \
